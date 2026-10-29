@@ -32,11 +32,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.BluetoothDisabled
@@ -132,6 +135,7 @@ fun BluetoothScreen(
     var hasPermissions by remember { mutableStateOf(false) }
     var pendingScan by remember { mutableStateOf(false) }
     var showCompatibilityDialog by remember { mutableStateOf(false) }
+    var showUserSettings by remember(savedDevice?.address) { mutableStateOf(false) }
     var deviceToSave by remember { mutableStateOf<ScannedDeviceInfo?>(null) }
     var deviceToDebug by remember { mutableStateOf<ScannedDeviceInfo?>(null) }
 
@@ -308,6 +312,7 @@ fun BluetoothScreen(
                         savedSupport?.let { support ->
                             CapabilityIconsRow(
                                 support = support,
+                                onManageUsers = { showUserSettings = true },
                                 onExplain = { label, implemented ->
                                     scope.launch {
                                         sharedViewModel.showSnackbar(
@@ -361,6 +366,23 @@ fun BluetoothScreen(
             }
         }
 
+
+        if (showUserSettings && savedSupport?.hasUserSettings == true) {
+            AlertDialog(
+                onDismissRequest = { showUserSettings = false },
+                title = { Text(stringResource(R.string.scale_user_settings_title)) },
+                text = {
+                    Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
+                        bluetoothViewModel.UserConfigurationUi()
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showUserSettings = false }) {
+                        Text(stringResource(android.R.string.ok))
+                    }
+                }
+            )
+        }
 
         if (showCompatibilityDialog) {
             CompatibilityAlertDialog(
@@ -594,11 +616,12 @@ private fun DeveloperModeAlertDialog(
  * Compact, icon-only capability row:
  * - Implemented features: normal tint (onSurface)
  * - Supported-only (not implemented): reduced alpha (visibly "disabled")
- * Tap an icon to show a short explanation via Snackbar.
+ * User sync opens the handler's user settings when available; other icons explain support.
  */
 @Composable
 private fun CapabilityIconsRow(
     support: DeviceSupport,
+    onManageUsers: () -> Unit,
     onExplain: (label: String, implemented: Boolean) -> Unit
 ) {
     val primary = MaterialTheme.colorScheme.onSurface
@@ -617,7 +640,8 @@ private fun CapabilityIconsRow(
                 val label = stringResource(cap.labelRes)
 
                 IconButton(onClick = {
-                    onExplain(label, impl)
+                    if (cap == DeviceCapability.USER_SYNC && support.hasUserSettings) onManageUsers()
+                    else onExplain(label, impl)
                 }) {
                     Icon(
                         imageVector = cap.icon,

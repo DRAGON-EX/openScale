@@ -54,7 +54,9 @@ sealed class BluetoothEvent {
     /** Emitted when a parsed measurement is available. */
     data class MeasurementReceived(
         val measurement: ScaleMeasurement,
-        val deviceAddress: String
+        val deviceAddress: String,
+        /** Called only after persistence succeeds (including an existing duplicate). */
+        val onSaved: (suspend () -> Unit)? = null
     ) : BluetoothEvent()
 
     /** Emitted for generic device-related errors. */
@@ -99,6 +101,9 @@ interface ScaleCommunicator {
      */
     @Composable
     fun DeviceConfigurationUi()
+
+    @Composable
+    fun UserConfigurationUi() = DeviceConfigurationUi()
 
     /** Stream of [BluetoothEvent] emitted by the communicator. */
     fun getEventsFlow(): SharedFlow<BluetoothEvent>

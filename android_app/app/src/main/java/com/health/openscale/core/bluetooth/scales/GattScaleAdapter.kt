@@ -108,6 +108,9 @@ class GattScaleAdapter(
         handler.DeviceConfigurationUi()
     }
 
+    @Composable
+    override fun UserConfigurationUi() = handler.UserConfigurationUi()
+
     private suspend fun ioGap(ms: Long) {
         if (ms > 0) delay(ms.milliseconds)
     }
@@ -203,7 +206,7 @@ class GattScaleAdapter(
             characteristic: BluetoothGattCharacteristic,
             status: GattStatus
         ) {
-            LogManager.d(TAG,"\u2190 write response chr=${characteristic.uuid} len=${value.size} status=${status} ${value.toHexPreview(24)}")
+            LogManager.d(TAG,"\u2190 write response chr=${characteristic.uuid} len=${value.size} status=${status} ${if (!handler.logRawPackets) "[private WPP payload]" else value.toHexPreview(24)}")
 
             deferredMap[characteristic.uuid]?.let { op ->
                 op.deferred.complete(Unit)
@@ -230,7 +233,7 @@ class GattScaleAdapter(
             characteristic: BluetoothGattCharacteristic,
             status: GattStatus
         ) {
-            LogManager.d(TAG,"\u2190 received data chr=${characteristic.uuid} len=${value.size} status=${status} ${value.toHexPreview(24)}")
+            LogManager.d(TAG,"\u2190 received data chr=${characteristic.uuid} len=${value.size} status=${status} ${if (!handler.logRawPackets) "[private WPP payload]" else value.toHexPreview(24)}")
 
             handler.handleNotification(characteristic.uuid, value)
 
@@ -314,7 +317,7 @@ class GattScaleAdapter(
                 ioGap(if (withResponse) tuning.writeWithResponseDelayMs else tuning.writeWithoutResponseDelayMs)
                 p.writeCharacteristic(service, characteristic, payload, type)
 
-                LogManager.d(TAG,"\u2192 write to chr=$characteristic svc=$service len=${payload.size} withResp=$withResponse ${payload.toHexPreview(24)}")
+                LogManager.d(TAG,"\u2192 write to chr=$characteristic svc=$service len=${payload.size} withResp=$withResponse ${if (!handler.logRawPackets) "[private WPP payload]" else payload.toHexPreview(24)}")
 
                 try {
                     withTimeout(tuning.operationTimeoutMs.milliseconds) {

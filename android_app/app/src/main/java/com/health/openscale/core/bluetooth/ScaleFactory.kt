@@ -62,6 +62,7 @@ import com.health.openscale.core.bluetooth.scales.MiScaleHandler
 import com.health.openscale.core.bluetooth.scales.MiScaleS400Handler
 import com.health.openscale.core.bluetooth.scales.XiaomiS800Handler
 import com.health.openscale.core.bluetooth.scales.BodyConnectHandler
+import com.health.openscale.core.bluetooth.scales.WithingsBodySmartHandler
 import com.health.openscale.core.bluetooth.scales.BodyPod2Handler
 import com.health.openscale.core.bluetooth.scales.OkOkHandler
 import com.health.openscale.core.bluetooth.scales.RedmondSkybalanceHandler
@@ -141,6 +142,7 @@ class ScaleFactory @Inject constructor(
          */
         @VisibleForTesting
         internal fun createHandlers(): List<ScaleDeviceHandler> = listOf(
+            WithingsBodySmartHandler(),
             PlainSigScaleHandler(),
             HealthKeep280Handler(),
             PicoocHandler(),
@@ -304,6 +306,7 @@ class ScaleFactory @Inject constructor(
         for (handler in modernKotlinHandlers) {
             val support = handler.supportFor(deviceInfo)
             if (support != null) {
+                handler.bindDevice(deviceInfo.address)
                 LogManager.i(TAG, "Modern handler '${support.displayName}' supports '$primaryIdentifier'.")
                 val modern = createModernCommunicator(handler, support)
                 if (modern != null) {

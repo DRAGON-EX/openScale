@@ -126,6 +126,9 @@ class BluetoothViewModel @Inject constructor(
     @Composable
     fun DeviceConfigurationUi() = bt.DeviceConfigurationUi()
 
+    @Composable
+    fun UserConfigurationUi() = bt.UserConfigurationUi()
+
     fun requestStartDeviceScan() {
         if (!bt.isBluetoothEnabled()) {
             emitSnack(R.string.bluetooth_must_be_enabled_for_scan, SnackbarDuration.Long)

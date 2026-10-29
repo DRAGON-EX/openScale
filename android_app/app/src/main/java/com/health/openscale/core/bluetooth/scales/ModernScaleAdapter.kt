@@ -46,6 +46,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -236,6 +238,17 @@ class FacadeDriverSettings(
         scope.launch { facade.saveSetting(k, value) }
     }
 
+    override fun observeString(key: String): Flow<String?> =
+        facade.observeSetting(prefix + key, null as String?).onEach { value ->
+            if (value == null) mem.remove(prefix + key) else mem[prefix + key] = value
+        }
+
+    override suspend fun putStringAndAwait(key: String, value: String) {
+        val k = prefix + key
+        facade.saveSetting(k, value)
+        mem[k] = value
+    }
+
     override fun remove(key: String) {
         val k = prefix + key
         mem.remove(k)
@@ -416,6 +429,11 @@ abstract class ModernScaleAdapter(
         override fun onPublish(measurement: ScaleMeasurement) {
             val addr = targetAddress ?: "unknown"
             _events.tryEmit(BluetoothEvent.MeasurementReceived(measurement, addr))
+        }
+
+        override fun onPublish(measurement: ScaleMeasurement, onSaved: suspend () -> Unit) {
+            val addr = targetAddress ?: "unknown"
+            _events.tryEmit(BluetoothEvent.MeasurementReceived(measurement, addr, onSaved))
         }
 
         override fun onInfo(@StringRes resId: Int, vararg args: Any) {

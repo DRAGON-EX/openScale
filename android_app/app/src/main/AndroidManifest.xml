@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- openScale works fully offline: strip network access even if a library declares it. -->
@@ -70,6 +72,15 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+        <service android:name=".core.bluetooth.WithingsListeningService" android:exported="false" android:foregroundServiceType="connectedDevice" />
+        <receiver android:name=".core.bluetooth.WithingsAdvertisementReceiver" android:exported="false" />
+        <receiver android:name=".core.bluetooth.WithingsScanRestoreReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.bluetooth.adapter.action.STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
         <receiver
             android:name=".core.worker.BootReceiver"
             android:enabled="true"

@@ -39,6 +39,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import com.health.openscale.core.bluetooth.WithingsAutoSync
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -73,6 +76,7 @@ interface BluetoothFacade {
     fun startScan(durationMs: Long)
     fun stopScan()
     fun connectToSavedDevice()
+    suspend fun connectToObservedBodySmart(savedAddress: String, observedAddress: String): Boolean = false
     fun attemptAutoConnectToSavedDevice()
     fun disconnect()
     fun saveAsPreferred(device: ScannedDeviceInfo)
@@ -86,6 +90,9 @@ interface BluetoothFacade {
 
     @Composable
     fun DeviceConfigurationUi()
+
+    @Composable
+    fun UserConfigurationUi() = DeviceConfigurationUi()
 }
 
 /**
@@ -164,7 +171,13 @@ class BluetoothFacadeImpl @Inject constructor(
     }
 
     @Composable
-    override fun DeviceConfigurationUi() {
+    override fun DeviceConfigurationUi() = ConfigurationUi(users = false)
+
+    @Composable
+    override fun UserConfigurationUi() = ConfigurationUi(users = true)
+
+    @Composable
+    private fun ConfigurationUi(users: Boolean) {
         val device by savedDevice.collectAsState()
 
         device?.let { dev ->
@@ -172,7 +185,7 @@ class BluetoothFacadeImpl @Inject constructor(
             val communicator = remember(dev) { scaleFactory.createCommunicator(dev) }
 
             // Render the device-specific UI directly from the communicator
-            communicator?.DeviceConfigurationUi()
+            if (users) communicator?.UserConfigurationUi() else communicator?.DeviceConfigurationUi()
         }
     }
 
@@ -233,6 +246,25 @@ class BluetoothFacadeImpl @Inject constructor(
             connection.connectToDevice(target)
         }
     }
+
+    override suspend fun connectToObservedBodySmart(savedAddress: String, observedAddress: String): Boolean =
+        withContext(Dispatchers.Main.immediate) {
+            val saved = settingsFacade.observeSavedDevice().first() ?: return@withContext false
+            if (saved.address != savedAddress || !WithingsAutoSync.isBodySmart(saved.name) ||
+                !android.bluetooth.BluetoothAdapter.checkBluetoothAddress(observedAddress) ||
+                settingsFacade.developerModeEnabled.first()) return@withContext false
+            currentAppUser.value = userFacade.observeSelectedUser().first() ?: return@withContext false
+            if (connectionStatus.value !in setOf(ConnectionStatus.NONE, ConnectionStatus.DISCONNECTED, ConnectionStatus.FAILED)) return@withContext false
+            // Keep profile mappings and credentials under the originally selected scale address.
+            settingsFacade.saveSetting(WithingsAutoSync.PREFIX + "alias/${observedAddress.uppercase()}", savedAddress.uppercase())
+            // Recheck after the suspending preference write so a UI connection wins this race.
+            if (connectionStatus.value !in setOf(ConnectionStatus.NONE, ConnectionStatus.DISCONNECTED, ConnectionStatus.FAILED)) return@withContext false
+            connection.connectToDevice(saved.copy(address = observedAddress, isSupported = true))
+            withTimeoutOrNull(5000) {
+                connectionStatus.first { connectedDeviceAddress.value == observedAddress &&
+                    it in setOf(ConnectionStatus.CONNECTING, ConnectionStatus.CONNECTED, ConnectionStatus.FAILED) }
+            }?.let { it != ConnectionStatus.FAILED } ?: false
+        }
 
     override fun attemptAutoConnectToSavedDevice() = connectToSavedDevice()
 

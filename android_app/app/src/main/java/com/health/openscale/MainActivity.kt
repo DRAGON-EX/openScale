@@ -53,6 +53,13 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var settingsFacade: SettingsFacade
 
+    @Inject lateinit var withingsAutoSync: com.health.openscale.core.bluetooth.WithingsAutoSync
+
+    override fun onResume() {
+        super.onResume()
+        withingsAutoSync.refresh()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

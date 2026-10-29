@@ -26,6 +26,7 @@ import com.health.openscale.core.bluetooth.scales.AfuB1Handler
 import com.health.openscale.core.bluetooth.scales.BeurerBF450Handler
 import com.health.openscale.core.bluetooth.scales.BeurerSanitasHandler
 import com.health.openscale.core.bluetooth.scales.BodyConnectHandler
+import com.health.openscale.core.bluetooth.scales.WithingsBodySmartHandler
 import com.health.openscale.core.bluetooth.scales.BodyPod2Handler
 import com.health.openscale.core.bluetooth.scales.CultSmartScaleProHandler
 import com.health.openscale.core.bluetooth.scales.ChipseaBleHandler
@@ -214,6 +215,7 @@ object ScaleCatalog {
         device("A&D_UC-352BLE_123456", uuid16(0x181D)) claimedBy PlainSigScaleHandler::class.java,
         device("LEFU_SCALE CF376", uuid16(0x181D), uuid16(0x181C)) claimedBy PlainSigScaleHandler::class.java,
         device("HEALTHKEEP 280") claimedBy HealthKeep280Handler::class.java,
+        device("Body Smart 32") claimedBy WithingsBodySmartHandler::class.java,
         device("AE BS-06") claimedBy ActiveEraBF06Handler::class.java,
         device("AFU-BH-TZ-B1", uuid16(0xFC50)) claimedBy AfuB1Handler::class.java,
         device("Keep_S3") claimedBy KeepS3Handler::class.java,

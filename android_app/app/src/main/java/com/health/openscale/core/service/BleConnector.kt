@@ -18,6 +18,7 @@
 package com.health.openscale.core.service
 
 import android.annotation.SuppressLint
+import androidx.annotation.VisibleForTesting
 import com.health.openscale.R
 import com.health.openscale.core.bluetooth.BluetoothEvent
 import com.health.openscale.core.bluetooth.ScaleCommunicator
@@ -244,7 +245,8 @@ class BleConnector(
      * @param event The [BluetoothEvent] to handle.
      * @param deviceInfo Information about the device that emitted the event.
      */
-    private fun handleBluetoothEvent(event: BluetoothEvent, deviceInfo: ScannedDeviceInfo) {
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    internal fun handleBluetoothEvent(event: BluetoothEvent, deviceInfo: ScannedDeviceInfo) {
         val deviceDisplayName = deviceInfo.name
         LogManager.d(TAG, "BluetoothEvent received: $event for $deviceDisplayName")
 
@@ -340,7 +342,7 @@ class BleConnector(
 
             is BluetoothEvent.MeasurementReceived -> {
                 LogManager.i(TAG, "Event: Measurement received from $deviceDisplayName: Weight ${event.measurement[MeasurementType.WEIGHT]}")
-                saveMeasurementFromEvent(event.measurement, deviceDisplayName)
+                saveMeasurementFromEvent(event.measurement, deviceDisplayName, event.onSaved)
             }
 
             is BluetoothEvent.DeviceMessage -> {
@@ -420,7 +422,8 @@ class BleConnector(
      */
     private fun saveMeasurementFromEvent(
         measurementData: ScaleMeasurement,
-        deviceName: String
+        deviceName: String,
+        onSaved: (suspend () -> Unit)? = null
     ) {
         val currentAppUserId = getCurrentUserId()
         if (currentAppUserId == 0) {
@@ -518,6 +521,9 @@ class BleConnector(
 
             try {
                 val measurementId = measurementFacade.saveMeasurementFromBleDevice(newDbMeasurement, values)
+                    ?.getOrThrow() ?: return@launch
+                onSaved?.invoke()
+                if (measurementId == -1) return@launch
                 LogManager.i(
                     TAG,
                     "Measurement from $deviceName for User $currentAppUserId saved (ID: $measurementId). Values: ${values.size}"

@@ -43,6 +43,8 @@ import com.health.openscale.core.bluetooth.data.ScaleUser
 import com.health.openscale.core.service.ScannedDeviceInfo
 import com.health.openscale.core.utils.LogManager
 import com.welie.blessed.BluetoothPeripheral
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.CoroutineScope
 import java.util.UUID
 import kotlin.math.min
@@ -55,13 +57,15 @@ import kotlin.math.min
  * @property implemented  Features this handler actually implements today (may be a subset).
  * @property tuningProfile Optional link timing/retry preferences (see [TuningProfile]).
  * @property linkMode     Whether the device uses GATT or broadcast-only advertisements.
+ * @property hasUserSettings Whether the User sync action opens a handler-specific editor.
  */
 data class DeviceSupport(
     val displayName: String,
     val capabilities: Set<DeviceCapability>,
     val implemented: Set<DeviceCapability>,
     val tuningProfile: TuningProfile = TuningProfile.Balanced,
-    val linkMode: LinkMode = LinkMode.CONNECT_GATT
+    val linkMode: LinkMode = LinkMode.CONNECT_GATT,
+    val hasUserSettings: Boolean = false
 )
 
 /** High-level capabilities a scale might offer. */
@@ -109,6 +113,12 @@ enum class BroadcastAction { IGNORED, CONSUMED_KEEP_SCANNING, CONSUMED_STOP }
 abstract class ScaleDeviceHandler {
     val TAG = this::class.simpleName ?: "ScaleDeviceHandler"
 
+    /** Authentication-bearing protocols must not expose raw packets in diagnostics. */
+    open val logRawPackets: Boolean = true
+
+    /** Supply the selected device identity before rendering offline configuration UI. */
+    internal open fun bindDevice(address: String) = Unit
+
     companion object {
         // Pseudo UUIDs for Classic/SPP
         val CLASSIC_DATA_UUID: UUID =
@@ -138,6 +148,10 @@ abstract class ScaleDeviceHandler {
             )
         }
     }
+
+    /** Optional scale-user settings, opened from the User sync capability action. */
+    @Composable
+    open fun UserConfigurationUi() = DeviceConfigurationUi()
 
     // --- Lifecycle entry points called by the adapter -------------------------
 
@@ -251,6 +265,11 @@ abstract class ScaleDeviceHandler {
             ?: logW("publish called without callbacks")
     }
 
+    /** Publish with a receipt that is acknowledged by the app after a successful database save. */
+    protected fun publish(measurement: ScaleMeasurement, onSaved: suspend () -> Unit) {
+        callbacks?.onPublish(measurement, onSaved) ?: logW("publish called without callbacks")
+    }
+
     /** Ask the adapter to terminate the link. */
     protected fun requestDisconnect() {
         logD("\u2192 request BLE disconnect")
@@ -279,7 +298,9 @@ abstract class ScaleDeviceHandler {
     protected fun settingsPutInt(key: String, value: Int) { settings.putInt(key, value) }
 
     protected fun settingsGetString(key: String, default: String? = null): String? = settings.getString(key, default)
+    protected fun settingsObserveString(key: String): Flow<String?> = settings.observeString(key)
     protected fun settingsPutString(key: String, value: String) { settings.putString(key, value) }
+    protected suspend fun settingsPutStringAndAwait(key: String, value: String) { settings.putStringAndAwait(key, value) }
 
     protected fun currentAppUser(): ScaleUser = data.currentUser()
     protected fun usersForDevice(): List<ScaleUser> = data.usersForDevice()
@@ -362,6 +383,8 @@ abstract class ScaleDeviceHandler {
 
         fun getString(key: String, default: String? = null): String?
         fun putString(key: String, value: String)
+        fun observeString(key: String): Flow<String?> = flowOf(getString(key))
+        suspend fun putStringAndAwait(key: String, value: String) { putString(key, value) }
 
         fun remove(key: String)
     }
@@ -369,6 +392,7 @@ abstract class ScaleDeviceHandler {
     /** App callbacks to emit parsed results and user-visible messages. */
     interface Callbacks {
         fun onPublish(measurement: ScaleMeasurement)
+        fun onPublish(measurement: ScaleMeasurement, onSaved: suspend () -> Unit) { onPublish(measurement) }
         fun onInfo(@StringRes resId: Int, vararg args: Any) { /* optional */ }
         fun onWarn(@StringRes resId: Int, vararg args: Any) { /* optional */ }
         fun onError(@StringRes resId: Int, t: Throwable? = null, vararg args: Any) { /* optional */ }

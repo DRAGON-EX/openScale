@@ -46,6 +46,8 @@ class OpenScaleApp : Application(), Configuration.Provider {
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
+    @Inject lateinit var withingsAutoSync: com.health.openscale.core.bluetooth.WithingsAutoSync
+
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
@@ -53,6 +55,7 @@ class OpenScaleApp : Application(), Configuration.Provider {
 
         initializeLogging()
         initializeDefaultData()
+        withingsAutoSync.start()
     }
 
     private fun initializeLogging() {

@@ -248,26 +248,26 @@ class MeasurementFacade @Inject constructor(
      * have reassigned it), so the gaps are filled from the history of the user the entry ends up on.
      * It also runs before CRUD applies the body-composition formulas, which lets an inherited
      * waist/neck/hips feed e.g. the US-Navy body fat formula.
+     *
+     * Returns the saved ID, -1 for an existing duplicate, or null when assignment rejected it.
      */
     suspend fun saveMeasurementFromBleDevice(
         measurement: Measurement,
         values: List<MeasurementValue>,
-    ) {
+    ): Result<Int>? {
         val ref = pendingReferenceUser
-        if (ref != null) {
+        return if (ref != null) {
             val finalValues = transformation.applyAssistedWeighing(measurement, values, ref)
             crud.saveMeasurement(
                 measurement,
                 transformation.applyValueInheritance(measurement, finalValues)
             )
         } else {
-            val finalMeasurement = transformation.applySmartUserAssignment(measurement, values)
-            if (finalMeasurement != null) {
-                crud.saveMeasurement(
-                    finalMeasurement,
-                    transformation.applyValueInheritance(finalMeasurement, values)
-                )
-            }
+            val finalMeasurement = transformation.applySmartUserAssignment(measurement, values) ?: return null
+            crud.saveMeasurement(
+                finalMeasurement,
+                transformation.applyValueInheritance(finalMeasurement, values)
+            )
         }
     }
 
